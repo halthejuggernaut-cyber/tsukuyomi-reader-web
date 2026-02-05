@@ -1,4 +1,5 @@
 import { qs, escapeHtml } from "./utils.js";
+import { setupHorizontalPaging } from "./paging.js";
 
 export function initReader({ book, settings, progress, onBack, onExport, onUpdateSettings, onUpdateProgress }) {
   const backBtn = qs("#backBtn");
@@ -8,6 +9,7 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
   const closeSettingsBtn = qs("#closeSettingsBtn");
   const settingsPanel = qs("#settingsPanel");
   const tocList = qs("#tocList");
+  const readerViewport = qs("#readerViewport") || qs("#bookContent");
   const bookContent = qs("#bookContent");
   const bookTitle = qs("#bookTitle");
   const topbar = qs("#readerTopbar");
@@ -17,7 +19,7 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
   const lineHeightRange = qs("#lineHeightRange");
   const letterSpacingRange = qs("#letterSpacingRange");
   const themeSelect = qs("#themeSelect");
-  const refreshHScroll = setupHScroll(bookContent);
+  const refreshHScroll = setupHScroll(readerViewport);
 
   backBtn.addEventListener("click", onBack);
   printBtn.addEventListener("click", () => window.print());
@@ -31,6 +33,11 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
   bindSettingsEvents();
   applyProgress(progress, refreshHScroll);
   bindProgressTracking();
+  setupHorizontalPaging(readerViewport, bookContent, {
+    wheelThreshold: 140,
+    wheelLockMs: 320,
+    touchThreshold: 60
+  });
   bindPageTap(bookContent);
 
   function toggleSettings(open) {
@@ -109,13 +116,13 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
   function bindProgressTracking() {
     const handler = throttle(() => {
       const chapterId = getCurrentChapterId();
-      const scrollLeft = bookContent.scrollLeft;
-      const w = bookContent.clientWidth || 1;
+      const scrollLeft = readerViewport.scrollLeft;
+      const w = readerViewport.clientWidth || 1;
       const pageIndex = Math.round(scrollLeft / w);
       onUpdateProgress({ chapterId, scrollLeft, pageIndex });
     }, 250);
 
-    bookContent.addEventListener("scroll", handler);
+    readerViewport.addEventListener("scroll", handler);
   }
 
   function getCurrentChapterId() {
@@ -143,11 +150,11 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
 
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const w = bookContent.clientWidth || 1;
+        const w = readerViewport.clientWidth || 1;
         if (nextProgress.pageIndex != null) {
-          bookContent.scrollLeft = Number(nextProgress.pageIndex) * w;
+          readerViewport.scrollLeft = Number(nextProgress.pageIndex) * w;
         } else if (nextProgress.scrollLeft != null) {
-          bookContent.scrollLeft = Number(nextProgress.scrollLeft) || 0;
+          readerViewport.scrollLeft = Number(nextProgress.scrollLeft) || 0;
         }
         if (typeof refresh === "function") refresh();
       });
