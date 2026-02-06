@@ -33,7 +33,7 @@ echo [backup] Changed files (from git status --porcelain):
 type "%TEMP%\git_changes.txt"
 echo.
 
-echo [backup] Above list will be committed & pushed.
+echo [backup] Above list will be committed and pushed.
 echo [backup] Continue? (Y/N)
 set /p ANS=
 if /I not "%ANS%"=="Y" (

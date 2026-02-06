@@ -107,6 +107,8 @@
   column-width: var(--page-width, 100vw);
   scroll-snap-type: x mandatory;
   scroll-behavior: smooth;
+  touch-action: manipulation;
+  -webkit-overflow-scrolling: touch;
 }
 
 .reader-content.mode-scrollx {
@@ -115,6 +117,8 @@
   column-width: auto;
   scroll-snap-type: none;
   scroll-behavior: smooth;
+  touch-action: pan-x;
+  -webkit-overflow-scrolling: touch;
 }
 
 .reader-content.mode-scrolly {
@@ -122,6 +126,10 @@
   overflow-x: hidden;
   column-width: auto;
   scroll-snap-type: none;
+  column-count: 1;
+  column-gap: 0;
+  touch-action: pan-y;
+  -webkit-overflow-scrolling: touch;
 }
 
 .reader-content.mode-paged > * {

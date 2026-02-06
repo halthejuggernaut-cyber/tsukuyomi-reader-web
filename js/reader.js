@@ -2,6 +2,8 @@ import { qs, escapeHtml } from "./utils.js";
 
 const TAP_LEFT_RATIO = 0.33;
 const TAP_RIGHT_RATIO = 0.66;
+const TAP_MOVE_THRESHOLD_PX = 12;
+const TAP_DEDUP_MS = 450;
 const WHEEL_DIRECTION = 1;
 const EFFECT_DURATION = {
   dim: 110,
@@ -274,9 +276,14 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
   function bindPageTap(content, mode, signal) {
     if (!content) return;
 
-    content.addEventListener("click", (e) => {
+    let startX = 0;
+    let startY = 0;
+    let moved = false;
+    let lastTouchTs = 0;
+
+    const handleTapAtClientX = (clientX) => {
       const rect = content.getBoundingClientRect();
-      const x = e.clientX - rect.left;
+      const x = clientX - rect.left;
       const w = rect.width || 1;
 
       if (x < w * TAP_LEFT_RATIO) {
@@ -288,18 +295,85 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
       } else {
         topbar.classList.toggle("hidden");
       }
+    };
+
+    content.addEventListener("touchstart", (e) => {
+      const t = e.touches[0];
+      if (!t) return;
+      startX = t.clientX;
+      startY = t.clientY;
+      moved = false;
+    }, { passive: true, signal });
+
+    content.addEventListener("touchmove", (e) => {
+      const t = e.touches[0];
+      if (!t) return;
+      const dx = Math.abs(t.clientX - startX);
+      const dy = Math.abs(t.clientY - startY);
+      if (dx > TAP_MOVE_THRESHOLD_PX || dy > TAP_MOVE_THRESHOLD_PX) {
+        moved = true;
+      }
+    }, { passive: true, signal });
+
+    content.addEventListener("touchend", (e) => {
+      lastTouchTs = Date.now();
+      if (moved) return;
+      const t = e.changedTouches && e.changedTouches[0];
+      if (!t) return;
+      handleTapAtClientX(t.clientX);
+    }, { passive: true, signal });
+
+    content.addEventListener("click", (e) => {
+      if (Date.now() - lastTouchTs < TAP_DEDUP_MS) return;
+      handleTapAtClientX(e.clientX);
     }, { signal });
   }
 
   function bindCenterTapOnly(content, signal) {
     if (!content) return;
-    content.addEventListener("click", (e) => {
+    let startX = 0;
+    let startY = 0;
+    let moved = false;
+    let lastTouchTs = 0;
+
+    const handleTapAtClientX = (clientX) => {
       const rect = content.getBoundingClientRect();
-      const x = e.clientX - rect.left;
+      const x = clientX - rect.left;
       const w = rect.width || 1;
       if (x >= w * TAP_LEFT_RATIO && x <= w * TAP_RIGHT_RATIO) {
         topbar.classList.toggle("hidden");
       }
+    };
+
+    content.addEventListener("touchstart", (e) => {
+      const t = e.touches[0];
+      if (!t) return;
+      startX = t.clientX;
+      startY = t.clientY;
+      moved = false;
+    }, { passive: true, signal });
+
+    content.addEventListener("touchmove", (e) => {
+      const t = e.touches[0];
+      if (!t) return;
+      const dx = Math.abs(t.clientX - startX);
+      const dy = Math.abs(t.clientY - startY);
+      if (dx > TAP_MOVE_THRESHOLD_PX || dy > TAP_MOVE_THRESHOLD_PX) {
+        moved = true;
+      }
+    }, { passive: true, signal });
+
+    content.addEventListener("touchend", (e) => {
+      lastTouchTs = Date.now();
+      if (moved) return;
+      const t = e.changedTouches && e.changedTouches[0];
+      if (!t) return;
+      handleTapAtClientX(t.clientX);
+    }, { passive: true, signal });
+
+    content.addEventListener("click", (e) => {
+      if (Date.now() - lastTouchTs < TAP_DEDUP_MS) return;
+      handleTapAtClientX(e.clientX);
     }, { signal });
   }
 
