@@ -94,17 +94,37 @@
   border-radius: 18px;
   padding: 24px;
   min-height: 70vh;
-  overflow-x: auto;
-  overflow-y: hidden;
-  column-width: 100vw;
+  overflow: hidden;
   column-gap: 0;
-  scroll-snap-type: x mandatory;
   font-size: calc(var(--font-size) * 1%);
   line-height: var(--line-height);
   letter-spacing: var(--letter-spacing);
 }
 
-.reader-content > * {
+.reader-content.mode-paged {
+  overflow-x: auto;
+  overflow-y: hidden;
+  column-width: var(--page-width, 100vw);
+  scroll-snap-type: x mandatory;
+  scroll-behavior: smooth;
+}
+
+.reader-content.mode-scrollx {
+  overflow-x: auto;
+  overflow-y: hidden;
+  column-width: auto;
+  scroll-snap-type: none;
+  scroll-behavior: smooth;
+}
+
+.reader-content.mode-scrolly {
+  overflow-y: auto;
+  overflow-x: hidden;
+  column-width: auto;
+  scroll-snap-type: none;
+}
+
+.reader-content.mode-paged > * {
   scroll-snap-align: start;
 }
 
@@ -119,6 +139,42 @@
   z-index: 5;
   background: transparent;
   pointer-events: none;
+}
+
+.page-effect {
+  position: fixed;
+  inset: 0;
+  background: transparent;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 120ms ease;
+  z-index: 6;
+}
+
+.page-effect.active {
+  opacity: 1;
+}
+
+.page-effect.dim {
+  background: rgba(0, 0, 0, 0.18);
+}
+
+.page-effect.fade {
+  background: rgba(0, 0, 0, 0.08);
+}
+
+.option-group {
+  display: grid;
+  gap: 6px;
+  color: var(--text);
+}
+
+.option-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  color: var(--text);
 }
 
 .settings-panel {

@@ -1,5 +1,12 @@
 import { qs, escapeHtml } from "./utils.js";
-import { setupHorizontalPaging } from "./paging.js";
+
+const TAP_LEFT_RATIO = 0.33;
+const TAP_RIGHT_RATIO = 0.66;
+const WHEEL_DIRECTION = 1;
+const EFFECT_DURATION = {
+  dim: 110,
+  fade: 140
+};
 
 export function initReader({ book, settings, progress, onBack, onExport, onUpdateSettings, onUpdateProgress }) {
   const backBtn = qs("#backBtn");
@@ -19,7 +26,14 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
   const lineHeightRange = qs("#lineHeightRange");
   const letterSpacingRange = qs("#letterSpacingRange");
   const themeSelect = qs("#themeSelect");
+  const displayModeRadios = Array.from(document.querySelectorAll("input[name=\"displayMode\"]"));
+  const pageEffectSelect = qs("#pageEffectSelect");
+  const tapInScroll = qs("#tapInScroll");
+  const pageEffect = qs("#pageEffect");
   const refreshHScroll = setupHScroll(readerViewport);
+  let modeController = null;
+  let currentMode = "paged";
+  let currentEffect = "none";
 
   backBtn.addEventListener("click", onBack);
   printBtn.addEventListener("click", () => window.print());
@@ -33,12 +47,7 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
   bindSettingsEvents();
   applyProgress(progress, refreshHScroll);
   bindProgressTracking();
-  setupHorizontalPaging(readerViewport, bookContent, {
-    wheelThreshold: 140,
-    wheelLockMs: 320,
-    touchThreshold: 60
-  });
-  bindPageTap(bookContent);
+  scheduleRefreshHScroll();
 
   function toggleSettings(open) {
     if (open) {
@@ -73,6 +82,7 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
     });
 
     // Phase 1は全文一括DOM生成。大容量対応はPhase 2で検討。
+    scheduleRefreshHScroll();
   }
 
   function applySettings(nextSettings) {
@@ -87,6 +97,18 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
     lineHeightRange.value = String(nextSettings.lineHeight ?? 1.8);
     letterSpacingRange.value = String(nextSettings.letterSpacing ?? 0);
     themeSelect.value = nextSettings.theme || "light";
+
+    const displayMode = nextSettings.displayMode || "paged";
+    const effect = nextSettings.pageEffect || "none";
+    const tapEnabled = Boolean(nextSettings.tapInScroll);
+    displayModeRadios.forEach((radio) => {
+      radio.checked = radio.value === displayMode;
+    });
+    pageEffectSelect.value = effect;
+    tapInScroll.checked = tapEnabled;
+    currentMode = displayMode;
+    currentEffect = effect;
+    applyDisplayMode(displayMode, { tapInScroll: tapEnabled });
   }
 
   function applyTheme(theme) {
@@ -99,6 +121,11 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
     lineHeightRange.addEventListener("input", () => updateSettings({ lineHeight: Number(lineHeightRange.value) }));
     letterSpacingRange.addEventListener("input", () => updateSettings({ letterSpacing: Number(letterSpacingRange.value) }));
     themeSelect.addEventListener("change", () => updateSettings({ theme: themeSelect.value }));
+    displayModeRadios.forEach((radio) => {
+      radio.addEventListener("change", () => updateSettings({ displayMode: radio.value }));
+    });
+    pageEffectSelect.addEventListener("change", () => updateSettings({ pageEffect: pageEffectSelect.value }));
+    tapInScroll.addEventListener("change", () => updateSettings({ tapInScroll: tapInScroll.checked }));
   }
 
   function updateSettings(patch) {
@@ -107,19 +134,66 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
       lineHeight: Number(lineHeightRange.value) || 1.8,
       letterSpacing: Number(letterSpacingRange.value) || 0,
       theme: themeSelect.value || "light",
+      displayMode: getCheckedDisplayMode(),
+      pageEffect: pageEffectSelect.value || "none",
+      tapInScroll: tapInScroll.checked,
       ...patch
     };
     applySettings(next);
     onUpdateSettings(next);
   }
 
+  function getCheckedDisplayMode() {
+    const checked = displayModeRadios.find((radio) => radio.checked);
+    return checked ? checked.value : "paged";
+  }
+
+  function applyDisplayMode(mode, options = {}) {
+    bookContent.classList.remove("mode-paged", "mode-scrollx", "mode-scrolly");
+    if (mode === "scrollX") {
+      bookContent.classList.add("mode-scrollx");
+    } else if (mode === "scrollY") {
+      bookContent.classList.add("mode-scrolly");
+    } else {
+      bookContent.classList.add("mode-paged");
+    }
+
+    if (modeController) modeController.abort();
+    modeController = new AbortController();
+    const signal = modeController.signal;
+
+    const tapEnabled = mode === "paged" || options.tapInScroll;
+    if (tapEnabled) {
+      bindPageTap(bookContent, mode, signal);
+    } else {
+      bindCenterTapOnly(bookContent, signal);
+    }
+
+    if (mode === "scrollX") {
+      bindWheelToHorizontalScroll(bookContent, signal);
+    }
+
+    if (hScroll) {
+      const enable = mode !== "scrollY";
+      hScroll.disabled = !enable;
+    }
+
+    scheduleRefreshHScroll();
+  }
+
   function bindProgressTracking() {
     const handler = throttle(() => {
       const chapterId = getCurrentChapterId();
+      const mode = getCheckedDisplayMode();
       const scrollLeft = readerViewport.scrollLeft;
+      const scrollTop = readerViewport.scrollTop;
       const w = readerViewport.clientWidth || 1;
       const pageIndex = Math.round(scrollLeft / w);
-      onUpdateProgress({ chapterId, scrollLeft, pageIndex });
+      const payload = { chapterId, scrollLeft, pageIndex };
+      if (mode === "scrollY") {
+        payload.scrollTop = scrollTop;
+      }
+      onUpdateProgress(payload);
     }, 250);
 
     readerViewport.addEventListener("scroll", handler);
@@ -146,15 +220,20 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
   }
 
   function applyProgress(nextProgress, refresh) {
-    if (!nextProgress) return;
-
     requestAnimationFrame(() => {
       requestAnimationFrame(() => {
-        const w = readerViewport.clientWidth || 1;
-        if (nextProgress.pageIndex != null) {
-          readerViewport.scrollLeft = Number(nextProgress.pageIndex) * w;
-        } else if (nextProgress.scrollLeft != null) {
-          readerViewport.scrollLeft = Number(nextProgress.scrollLeft) || 0;
+        if (nextProgress) {
+          const mode = getCheckedDisplayMode();
+          if (mode === "scrollY" && nextProgress.scrollTop != null) {
+            readerViewport.scrollTop = Number(nextProgress.scrollTop) || 0;
+          } else {
+            const w = readerViewport.clientWidth || 1;
+            if (nextProgress.pageIndex != null) {
+              readerViewport.scrollLeft = Number(nextProgress.pageIndex) * w;
+            } else if (nextProgress.scrollLeft != null) {
+              readerViewport.scrollLeft = Number(nextProgress.scrollLeft) || 0;
+            }
+          }
         }
         if (typeof refresh === "function") refresh();
       });
@@ -163,9 +242,10 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
 
   function setupHScroll(content) {
     const slider = hScroll;
-    if (!slider || !content) return;
+    if (!slider || !content) return () => {};
 
     const refresh = () => {
+      content.style.setProperty("--page-width", `${content.clientWidth}px`);
       const max = Math.max(0, content.scrollWidth - content.clientWidth);
       slider.max = String(max);
       slider.value = String(Math.min(max, content.scrollLeft));
@@ -191,7 +271,7 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
     return refresh;
   }
 
-  function bindPageTap(content) {
+  function bindPageTap(content, mode, signal) {
     if (!content) return;
 
     content.addEventListener("click", (e) => {
@@ -199,14 +279,59 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
       const x = e.clientX - rect.left;
       const w = rect.width || 1;
 
-      if (x < w * 0.33) {
-        pageBy(content, -content.clientWidth);
-      } else if (x > w * 0.66) {
-        pageBy(content, content.clientWidth);
+      if (x < w * TAP_LEFT_RATIO) {
+        pageBy(content, mode, -1);
+        if (mode === "paged") triggerPageEffect(currentEffect);
+      } else if (x > w * TAP_RIGHT_RATIO) {
+        pageBy(content, mode, 1);
+        if (mode === "paged") triggerPageEffect(currentEffect);
       } else {
         topbar.classList.toggle("hidden");
       }
+    }, { signal });
+  }
+
+  function bindCenterTapOnly(content, signal) {
+    if (!content) return;
+    content.addEventListener("click", (e) => {
+      const rect = content.getBoundingClientRect();
+      const x = e.clientX - rect.left;
+      const w = rect.width || 1;
+      if (x >= w * TAP_LEFT_RATIO && x <= w * TAP_RIGHT_RATIO) {
+        topbar.classList.toggle("hidden");
+      }
+    }, { signal });
+  }
+
+  function bindWheelToHorizontalScroll(content, signal) {
+    if (!content) return;
+    const direction = WHEEL_DIRECTION;
+    content.addEventListener("wheel", (e) => {
+      e.preventDefault();
+      const useY = Math.abs(e.deltaY) >= Math.abs(e.deltaX);
+      const delta = (useY ? e.deltaY : e.deltaX) * direction;
+      content.scrollLeft += delta;
+    }, { passive: false, signal });
+  }
+
+  function scheduleRefreshHScroll() {
+    requestAnimationFrame(() => {
+      refreshHScroll();
+      requestAnimationFrame(() => {
+        refreshHScroll();
+      });
     });
+  }
+
+  function triggerPageEffect(effect) {
+    if (!pageEffect || effect === "none") return;
+    pageEffect.classList.remove("dim", "fade");
+    pageEffect.classList.add(effect, "active");
+    const duration = effect === "fade" ? EFFECT_DURATION.fade : EFFECT_DURATION.dim;
+    setTimeout(() => {
+      pageEffect.classList.remove("active");
+      pageEffect.classList.remove(effect);
+    }, duration);
   }
 }
 
@@ -224,6 +349,14 @@ function throttle(fn, wait) {
   };
 }
 
-function pageBy(content, delta) {
+function pageBy(content, mode, deltaPages) {
+  if (!content) return;
+  if (mode === "scrollY") {
+    const delta = deltaPages * content.clientHeight;
+    content.scrollTo({ top: content.scrollTop + delta, behavior: "smooth" });
+    return;
+  }
+
+  const delta = deltaPages * content.clientWidth;
   content.scrollTo({ left: content.scrollLeft + delta, behavior: "smooth" });
 }

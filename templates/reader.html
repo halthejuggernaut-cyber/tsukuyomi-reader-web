@@ -24,6 +24,7 @@
   </div>
 
   <div class="tap-zone" id="tapZone"></div>
+  <div class="page-effect" id="pageEffect" aria-hidden="true"></div>
 
   <aside class="settings-panel" id="settingsPanel" aria-hidden="true">
     <header>
@@ -52,6 +53,40 @@
         <option value="light">Light</option>
         <option value="dark">Dark</option>
       </select>
+    </div>
+
+    <div class="field">
+      <label class="label">表示モード</label>
+      <div class="option-group" id="displayModeGroup">
+        <label class="option-item">
+          <input type="radio" name="displayMode" value="paged" />
+          ページ送り
+        </label>
+        <label class="option-item">
+          <input type="radio" name="displayMode" value="scrollX" />
+          横連続
+        </label>
+        <label class="option-item">
+          <input type="radio" name="displayMode" value="scrollY" />
+          縦連続
+        </label>
+      </div>
+    </div>
+
+    <div class="field">
+      <label class="label" for="pageEffectSelect">切替効果</label>
+      <select id="pageEffectSelect">
+        <option value="none">なし</option>
+        <option value="dim">暗転</option>
+        <option value="fade">フェード</option>
+      </select>
+    </div>
+
+    <div class="field">
+      <label class="option-item">
+        <input type="checkbox" id="tapInScroll" />
+        連続表示でもタップで送る
+      </label>
     </div>
   </aside>
 </section>

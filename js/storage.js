@@ -67,12 +67,17 @@ export async function exportZipFromBook(book, options = {}) {
     fontSize: 100,
     lineHeight: 1.8,
     letterSpacing: 0,
-    theme: "light"
+    theme: "light",
+    displayMode: "paged",
+    pageEffect: "none",
+    tapInScroll: false
   };
 
   const progress = options.progress || {
     chapterId: "chapter-001",
-    scrollTop: 0
+    scrollLeft: 0,
+    scrollTop: 0,
+    pageIndex: 0
   };
 
   const meta = {
@@ -81,13 +86,18 @@ export async function exportZipFromBook(book, options = {}) {
     createdAt: new Date().toISOString(),
     progress: {
       chapterId: progress.chapterId || "chapter-001",
-      scrollTop: Number.isFinite(progress.scrollTop) ? progress.scrollTop : 0
+      scrollLeft: Number.isFinite(progress.scrollLeft) ? progress.scrollLeft : 0,
+      scrollTop: Number.isFinite(progress.scrollTop) ? progress.scrollTop : 0,
+      pageIndex: Number.isFinite(progress.pageIndex) ? progress.pageIndex : 0
     },
     settings: {
       fontSize: Number(settings.fontSize) || 100,
       lineHeight: Number(settings.lineHeight) || 1.8,
       letterSpacing: Number(settings.letterSpacing) || 0,
-      theme: settings.theme || "light"
+      theme: settings.theme || "light",
+      displayMode: settings.displayMode || "paged",
+      pageEffect: settings.pageEffect || "none",
+      tapInScroll: Boolean(settings.tapInScroll)
     },
     toc: Array.isArray(book.toc) ? book.toc : []
   };
