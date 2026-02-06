@@ -20,6 +20,15 @@
   transition: transform 0.2s ease;
 }
 
+.version-badge {
+  font-size: 12px;
+  opacity: 0.75;
+  user-select: none;
+  pointer-events: none;
+  margin-right: auto;
+  color: var(--muted);
+}
+
 .reader-topbar.hidden {
   transform: translateY(-110%);
 }

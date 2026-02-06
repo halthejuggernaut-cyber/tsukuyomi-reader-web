@@ -1,4 +1,5 @@
 import { qs, escapeHtml } from "./utils.js";
+import { APP_VERSION } from "./version.js";
 
 const TAP_LEFT_RATIO = 0.33;
 const TAP_RIGHT_RATIO = 0.66;
@@ -21,6 +22,7 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
   const readerViewport = qs("#readerViewport") || qs("#bookContent");
   const bookContent = qs("#bookContent");
   const bookTitle = qs("#bookTitle");
+  const versionBadge = qs("#versionBadge");
   const topbar = qs("#readerTopbar");
   const tapZone = qs("#tapZone");
   const hScroll = qs("#hScroll");
@@ -40,6 +42,9 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
   backBtn.addEventListener("click", onBack);
   printBtn.addEventListener("click", () => window.print());
   exportBtn.addEventListener("click", onExport);
+  if (versionBadge) {
+    versionBadge.textContent = `v${APP_VERSION}`;
+  }
 
   settingsBtn.addEventListener("click", () => toggleSettings(true));
   closeSettingsBtn.addEventListener("click", () => toggleSettings(false));
