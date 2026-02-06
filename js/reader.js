@@ -164,13 +164,13 @@ export function initReader({ book, settings, progress, onBack, onExport, onUpdat
 
     const tapEnabled = mode === "paged" || options.tapInScroll;
     if (tapEnabled) {
-      bindPageTap(bookContent, mode, signal);
+      bindPageTap(readerViewport, mode, signal);
     } else {
-      bindCenterTapOnly(bookContent, signal);
+      bindCenterTapOnly(readerViewport, signal);
     }
 
     if (mode === "scrollX") {
-      bindWheelToHorizontalScroll(bookContent, signal);
+      bindWheelToHorizontalScroll(readerViewport, signal);
     }
 
     if (hScroll) {
